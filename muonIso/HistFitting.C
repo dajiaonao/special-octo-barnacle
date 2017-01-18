@@ -1,3 +1,6 @@
+/// Use locations:
+// /home/dzhang/work/muons/isolation/iso207/testing
+
 #include <TH1.h>
 #include <TFile.h>
 #include <TCanvas.h>
@@ -47,7 +50,7 @@ public:
 //     return hA.Chi2Test(&hB, "WWCHI2");
     }
 
-   double getEff(TH1F* t_hP1, TH1F* t_hF1, TH1F* t_hP2, TH1F* t_hF2){
+   double getEff(TH1F* t_hP1, TH1F* t_hF1, TH1F* t_hP2, TH1F* t_hF2, int checkMode=0){
      hP1 = t_hP1;
      hF1 = t_hF1;
      hP2 = t_hP2;
@@ -88,6 +91,88 @@ public:
      TF = xs[1];
      effErr = sqrt(min.CovMatrix(0,0));
      TFErr = sqrt(min.CovMatrix(1,1));
+
+     if(checkMode == 1) checkEff();
+   }
+
+  double checkEff(TString lx="testing", TString savename="temp_figs/testing"){
+    float e = eff;
+    float s = TF;
+    float eP = (1.-e)/e;
+
+    TLatex lt;
+
+    TCanvas* cxx1 = new TCanvas();
+    cxx1->Divide(2,2);
+
+    /// check plot 1: the passed ones, The fit histograms
+    cxx1->cd(1);
+
+    TH1F* hA = (TH1F*)hP1->Clone("hA");
+    hA->Scale(eP);
+    hA->Add(hF2, s);
+
+    TH1F* hB = (TH1F*)hP2->Clone("hB");
+    hB->Add(hF1, s*eP);
+
+    hA->SetLineColor(2);
+    hA->SetMarkerColor(2);
+    hA->SetMarkerStyle(24);
+    hA->DrawCopy();
+    hB->DrawCopy("same");
+    lt.DrawLatexNDC(0.7,0.8, "Fit histograms");
+
+    /// check plot 2: show signal, with estimated background subtracted 
+    auto pad2 = cxx1->cd(2);
+    hP1->DrawCopy();
+
+    TH1F* hC = (TH1F*)hF1->Clone("hC");
+    hC->Scale(s);
+    hC->SetLineColor(2);
+    hC->SetMarkerColor(2);
+    hC->SetMarkerStyle(24);
+    hC->DrawCopy("same");
+
+    TH1F* hP1c=(TH1F*)hP1->Clone("hP1c");
+    hP1c->Add(hC,-1);
+
+    hP1c->SetLineColor(4);
+    hP1c->SetMarkerColor(4);
+    hP1c->SetMarkerStyle(25);
+    hP1c->DrawCopy("same");
+
+    pad2->SetLogy();
+    lt.DrawLatexNDC(0.7,0.8, "Bkg subtraction");
+
+    /// check plot 3
+    cxx1->cd(3);
+    hP2->DrawCopy();
+
+    TH1F* hD = (TH1F*)hF2->Clone("hD");
+    hD->Scale(s);
+    hD->SetLineColor(2);
+    hD->SetMarkerColor(2);
+    hD->SetMarkerStyle(24);
+    hD->DrawCopy("same");
+    lt.DrawLatexNDC(0.7,0.8, "SS pass/fail");
+
+    /// check plot 4
+    cxx1->cd(4);
+    hF1->SetLineColor(2);
+    hF1->SetMarkerColor(2);
+    hF1->SetMarkerStyle(24);
+    hF2->DrawNormalized();
+    hF1->DrawNormalized("same");
+
+    lt.DrawLatexNDC(0.7,0.8, "Bkg shapes");
+    cxx1->Update();
+
+    /// save the plots
+    cxx1->SaveAs(savename+".eps");
+    cxx1->SaveAs(savename+".pdf");
+    cxx1->SaveAs("png/"+savename+".png");
+
+    return 0;
    }
 };
 
@@ -164,7 +249,6 @@ int HistMore(){
   return 0;
 }
 
-
 int HistFitting(){
 
 //   TFile fPass("/home/dzhang/links/download/Dist_Bkg_ptCut56_NoMllCut_passIso.root","read");
@@ -183,8 +267,9 @@ int HistFitting(){
   TH1F* hF2 = (TH1F*) cav2->GetPrimitive("eff_bkg_Draw");
 
 //   return run_HistFitting(hP1, hF1, hP2, hF2);
-//   effFitter j;
-//   j.getEff(hP1, hF1, hP2, hF2);
+  effFitter j;
+  j.getEff(hP1, hF1, hP2, hF2, 1);
+  return 0;
 
 
 //   0.910141,4.6401
@@ -207,7 +292,8 @@ int HistFitting(){
   TLatex lt;
 
   TCanvas* cxx1 = new TCanvas();
-  cxx1->cd();
+  cxx1->Divide(2,2);
+  cxx1->cd(1);
 
   TH1F* hA = (TH1F*)hP1->Clone("hA");
   hA->Scale(eP);
@@ -225,8 +311,9 @@ int HistFitting(){
 
   cxx1->Update();
 
-  TCanvas* cxx2 = new TCanvas();
-  cxx2->cd();
+//   TCanvas* cxx2 = new TCanvas();
+//   cxx2->cd();
+  cxx1->cd(2);
   hP1->DrawCopy();
 
   TH1F* hC = (TH1F*)hF1->Clone("hC");
@@ -245,10 +332,11 @@ int HistFitting(){
   hP1c->DrawCopy("same");
 
   lt.DrawLatexNDC(0.7,0.8, lx);
-  cxx2->Update();
+//   cxx2->Update();
 
-  TCanvas* cxx3 = new TCanvas();
-  cxx3->cd();
+  cxx1->cd(3);
+//   TCanvas* cxx3 = new TCanvas();
+//   cxx3->cd();
   hP2->DrawCopy();
 
   TH1F* hD = (TH1F*)hF2->Clone("hD");
@@ -259,10 +347,11 @@ int HistFitting(){
   hD->DrawCopy("same");
 
   lt.DrawLatexNDC(0.7,0.8, lx);
-  cxx3->Update();
+//   cxx3->Update();
 
-  TCanvas* cxx4 = new TCanvas();
-  cxx4->cd();
+  cxx1->cd(4);
+//   TCanvas* cxx4 = new TCanvas();
+//   cxx4->cd();
 //   hP2->DrawCopy();
   hF1->SetLineColor(2);
   hF1->SetMarkerColor(2);
@@ -278,7 +367,7 @@ int HistFitting(){
 //   hFx->DrawCopy("same");
 
   lt.DrawLatexNDC(0.7,0.8, lx);
-  cxx4->Update();
+//   cxx4->Update();
 
 //   TH1F h1("h1","h1",10,0,10);
 //   TH1F* h2 = (TH1F*)h1.Clone("h2");
@@ -290,6 +379,8 @@ int HistFitting(){
 //   for(int i=0; i<10000;i++){h2->Fill(i);}
 
 //   std::cout << "chi2 = " << h1.Chi2Test(h2,"UU") << std::endl;
+
+  cxx1->Update();
 
   return 0;
 }
