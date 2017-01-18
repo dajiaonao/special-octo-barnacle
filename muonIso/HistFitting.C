@@ -14,6 +14,7 @@
 #include "Math/Functor.h"
 #include <TLatex.h>
 #include <vector>
+#include <string>
 
 class effFitter{
    TH1F* hP1;
@@ -25,6 +26,7 @@ public:
    float effErr;
    float TF;
    float TFErr;
+   TString fitMessage;
 
    double getChi(const double *xx){
     float e = xx[0];
@@ -50,7 +52,7 @@ public:
 //     return hA.Chi2Test(&hB, "WWCHI2");
     }
 
-   double getEff(TH1F* t_hP1, TH1F* t_hF1, TH1F* t_hP2, TH1F* t_hF2, int checkMode=0){
+   double getEff(TH1F* t_hP1, TH1F* t_hF1, TH1F* t_hP2, TH1F* t_hF2, std::string checkMode=""){
      hP1 = t_hP1;
      hF1 = t_hF1;
      hP2 = t_hP2;
@@ -92,10 +94,13 @@ public:
      effErr = sqrt(min.CovMatrix(0,0));
      TFErr = sqrt(min.CovMatrix(1,1));
 
-     if(checkMode == 1) checkEff();
+     if(checkMode != ""){
+       checkEff(checkMode);
+      }
    }
 
-  double checkEff(TString lx="testing", TString savename="temp_figs/testing"){
+//   double checkEff(std::string savename="noSave"){
+  double checkEff(TString savename="noSave"){
     float e = eff;
     float s = TF;
     float eP = (1.-e)/e;
@@ -120,7 +125,8 @@ public:
     hA->SetMarkerStyle(24);
     hA->DrawCopy();
     hB->DrawCopy("same");
-    lt.DrawLatexNDC(0.7,0.8, "Fit histograms");
+    lt.DrawLatexNDC(0.6,0.9, fitMessage);
+    lt.DrawLatexNDC(0.6,0.8, "Fit histograms");
 
     /// check plot 2: show signal, with estimated background subtracted 
     auto pad2 = cxx1->cd(2);
@@ -142,7 +148,7 @@ public:
     hP1c->DrawCopy("same");
 
     pad2->SetLogy();
-    lt.DrawLatexNDC(0.7,0.8, "Bkg subtraction");
+    lt.DrawLatexNDC(0.6,0.8, "Bkg subtraction");
 
     /// check plot 3
     cxx1->cd(3);
@@ -154,7 +160,7 @@ public:
     hD->SetMarkerColor(2);
     hD->SetMarkerStyle(24);
     hD->DrawCopy("same");
-    lt.DrawLatexNDC(0.7,0.8, "SS pass/fail");
+    lt.DrawLatexNDC(0.6,0.8, "SS pass/fail");
 
     /// check plot 4
     cxx1->cd(4);
@@ -164,13 +170,15 @@ public:
     hF2->DrawNormalized();
     hF1->DrawNormalized("same");
 
-    lt.DrawLatexNDC(0.7,0.8, "Bkg shapes");
+    lt.DrawLatexNDC(0.6,0.8, "Bkg shapes");
     cxx1->Update();
 
     /// save the plots
-    cxx1->SaveAs(savename+".eps");
-    cxx1->SaveAs(savename+".pdf");
-    cxx1->SaveAs("png/"+savename+".png");
+    if(savename!="noSave"){
+      cxx1->SaveAs(savename+".eps");
+      cxx1->SaveAs(savename+".pdf");
+      cxx1->SaveAs(savename+".png");
+     }
 
     return 0;
    }
@@ -231,7 +239,8 @@ int HistMore(){
     TH1F* hP2 = (TH1F*) cav2->GetPrimitive("eff_Data_Draw");
     TH1F* hF2 = (TH1F*) cav2->GetPrimitive("eff_bkg_Draw");
 
-    j.getEff(hP1, hF1, hP2, hF2);
+    j.fitMessage = x;
+    j.getEff(hP1, hF1, hP2, hF2, "figs_2017Jan18/fit_"+x);
     std::cout << x << " e=" << j.eff << "+/-" << j.effErr << " s=" << j.TF << "+/-" << j.TFErr << std::endl;
 
     int n = gEff.GetN();
@@ -268,7 +277,7 @@ int HistFitting(){
 
 //   return run_HistFitting(hP1, hF1, hP2, hF2);
   effFitter j;
-  j.getEff(hP1, hF1, hP2, hF2, 1);
+  j.getEff(hP1, hF1, hP2, hF2, "testing");
   return 0;
 
 
@@ -386,6 +395,6 @@ int HistFitting(){
 }
 
 int main(){
-  return HistFitting();
-//   return HistMore();
+//   return HistFitting();
+  return HistMore();
 }
