@@ -20,13 +20,14 @@
 #include <string>
 
 class effFitter{
+public:
    TH1F* hOS1;
    TH1F* hSS1;
    TH1F* hOS2;
    TH1F* hSS2;
    TH1F* hMC1;
    TH1F* hMC2;
-public:
+   TH1F* hMCr;
    float eff;
    float effErr;
    float TF;
@@ -39,7 +40,123 @@ public:
 
    void setMC(TH1F* h1, TH1F* h2){hMC1 = h1; hMC2 = h2;}
 
+
+   void showHists(TString savename="test"){
+    float e = eff;
+    float s = TF;
+
+    TH1F e1(*hMC1);
+    TH1F hMC0(*hMC1);
+    hMC0.Add(hMC2);
+    e1.Divide(&hMC0);
+
+    /// multiply scalar efficiency
+    std::cout << e1.GetMaximumBin() << "->" << e1.GetBinContent(e1.GetMaximumBin()) << " " << e << std::endl;
+    e1.Scale(e/e1.GetBinContent(e1.GetMaximumBin()));
+
+    TH1F e1m(e1); /// 1-eff
+    for(int i=0;i<e1m.GetNbinsX()+2;i++){
+      e1m.SetBinContent(i, 1.-e1m.GetBinContent(i));
+     }
+
+    /* The method:  ssPass*TF*(1-e) + osFail*e = osPass*(1-e) + ssFail*T*e is the formular*/
+    TH1F hA1(*hSS1);
+    hA1.Multiply(&e1m);
+    hA1.Scale(s);
+
+    TH1F hA2(*hOS2);
+    hA2.Multiply(&e1);
+
+    /// LHS
+    TH1F hA(hA1);
+    hA.Add(&hA2);
+
+    TH1F hB1(*hOS1);
+    hB1.Multiply(&e1m);
+
+    TH1F hB2(*hSS2);
+    hB2.Multiply(&e1);
+    hB2.Scale(s);
+
+    /// RHS
+    TH1F hB(hB1);
+    hB.Add(&hB2);
+
+    TCanvas cv;
+    cv.Divide(3,2);
+    cv.cd(1);
+    hA1.Draw();
+
+    cv.cd(2);
+    hA2.Draw();
+
+    cv.cd(3);
+    hA.Draw();
+
+    cv.cd(4);
+    hB1.Draw();
+
+    cv.cd(5);
+    hB2.Draw();
+
+    cv.cd(6);
+    hB.Draw();
+
+    cv.SaveAs(savename+".png");
+    
+    return;
+    }
+
    double getChi(const double *xx){
+    float e = xx[0];
+    float s = xx[1];
+    float eP = (1.-e)/e;
+
+    TH1F e1(*hMC1);
+    TH1F hMC0(*hMC1);
+    hMC0.Add(hMC2);
+    e1.Divide(&hMC0);
+
+    /// multiply scalar efficiency
+    e1.Scale(e/e1.GetBinContent(e1.GetMaximumBin()));
+
+    TH1F e1m(e1);
+    for(int i=0;i<e1m.GetNbinsX()+2;i++){
+      e1m.SetBinContent(i, 1.-e1m.GetBinContent(i));
+     }
+
+    /* The method:  ssPass*TF*(1-e) + osFail*e = osPass*(1-e) + ssFail*T*e is the formular*/
+    TH1F hA(*hSS1);
+    hA.Multiply(&e1m);
+    hA.Scale(s);
+
+    TH1F hA2(*hOS2);
+    hA2.Multiply(&e1);
+
+    /// LHS
+    hA.Add(&hA2);
+
+    TH1F hB(*hOS1);
+    hB.Multiply(&e1m);
+
+    TH1F hB2(*hSS2);
+    hB2.Multiply(&e1);
+    hB2.Scale(s);
+
+    /// RHS
+    hB.Add(&hB2);
+
+    /// fit
+    double r=0.;
+    for(int i=1; i<hA.GetNbinsX()+1;i++){
+      r += pow(hA.GetBinContent(i)-hB.GetBinContent(i),2)/(pow(hA.GetBinError(i),2)+pow(hB.GetBinError(i),2));
+    }
+
+    return r;
+    }
+
+
+   double getChiS(const double *xx){
     float e = xx[0];
     float s = xx[1];
 
@@ -86,7 +203,7 @@ public:
      min.SetVariable(0,"x",variable[0], step[0]);
      min.SetVariable(1,"y",variable[1], step[1]);
 
-     min.SetVariableLimits(0, 0.6, 1.);
+     min.SetVariableLimits(0, 0.6, 1);
      min.SetVariableLimits(1, 0.5, 10);
    
      min.Minimize(); 
@@ -101,10 +218,151 @@ public:
      TFErr = sqrt(min.CovMatrix(1,1));
 
      if(checkMode != ""){
-       checkEff(checkMode);
+       checkEff1(checkMode);
       }
 
      return 0;
+   }
+
+  double checkEff1(TString savename="noSave"){
+
+    float e = eff;
+    float s = TF;
+
+    TH1F e1(*hMC1);
+    TH1F hMC0(*hMC1);
+    hMC0.Add(hMC2);
+    e1.Divide(&hMC0);
+
+    /// multiply scalar efficiency
+    e1.Scale(e/e1.GetBinContent(e1.GetMaximumBin()));
+
+    TH1F e1m(e1); /// 1-eff
+    for(int i=0;i<e1m.GetNbinsX()+2;i++){
+      e1m.SetBinContent(i, 1.-e1m.GetBinContent(i));
+     }
+
+    /* The method:  ssPass*TF*(1-e) + osFail*e = osPass*(1-e) + ssFail*T*e is the formular*/
+    TH1F hA(*hSS1);
+    hA.Multiply(&e1m);
+    hA.Scale(s);
+
+    TH1F hA2(*hOS2);
+    hA2.Multiply(&e1);
+
+    /// LHS
+    hA.Add(&hA2);
+
+    TH1F hB(*hOS1);
+    hB.Multiply(&e1m);
+
+    TH1F hB2(*hSS2);
+    hB2.Multiply(&e1);
+    hB2.Scale(s);
+
+    /// RHS
+    hB.Add(&hB2);
+
+/////////////////////////
+    TLatex lt;
+
+    TCanvas* cxx1 = new TCanvas();
+    cxx1->Divide(3,2);
+
+    /// check plot 1: the passed ones, The fit histograms
+    cxx1->cd(1);
+
+    hA.SetLineColor(2);
+    hA.SetMarkerColor(2);
+    hA.SetMarkerStyle(24);
+    hA.DrawCopy();
+    hB.DrawCopy("same");
+    lt.DrawLatexNDC(0.5,0.9, fitMessage);
+    lt.DrawLatexNDC(0.5,0.8, "Fit histograms");
+
+    /// check plot 2: show signal, with estimated background subtracted 
+    auto pad2 = cxx1->cd(2);
+    hOS1->DrawCopy();
+
+    TH1F* hC = (TH1F*)hSS1->Clone("hC");
+    hC->Scale(s);
+    hC->SetLineColor(2);
+    hC->SetMarkerColor(2);
+    hC->SetMarkerStyle(24);
+    hC->DrawCopy("same");
+
+    TH1F* hOS1c=(TH1F*)hOS1->Clone("hOS1c");
+    hOS1c->Add(hC,-1);
+
+    hOS1c->SetLineColor(4);
+    hOS1c->SetMarkerColor(4);
+    hOS1c->SetMarkerStyle(25);
+    hOS1c->DrawCopy("same");
+
+    if(hMC1){
+      TH1F* hMC_t = (TH1F*)hMC1->Clone("hMC_temp");
+      hMC_t->Scale(hOS1c->Integral()/hMC1->Integral());
+      hMC_t->SetLineColor(6);
+      hMC_t->Draw("same");
+
+      cxx1->cd(5);
+      TH1F* hOS1c_t = (TH1F*)hOS1c->Clone("hOS1c_t");
+      hOS1c_t->Divide(hMC_t);
+      hOS1c_t->Draw();
+      hOS1c_t->GetYaxis()->SetRangeUser(0.5,1);
+
+      if(hMC2){
+        cxx1->cd(6);
+        hMC1->Draw();
+        hMC2->SetLineStyle(2);
+        hMC2->Draw("same");
+
+        cxx1->cd(5);
+        TH1F* hMC_t3 = (TH1F*)hMC1->Clone("hMC_temp3");
+        TH1F* hMC_t4 = (TH1F*)hMC1->Clone("hMC_temp4");
+        hMC_t3->Add(hMC2);
+        hMC_t4->Divide(hMC_t3);
+        hMC_t4->Draw("same");
+//         gPad->Update();
+      }
+
+      cxx1->cd(2);
+     }
+
+    pad2->SetLogy();
+    lt.DrawLatexNDC(0.6,0.8, "Bkg subtraction");
+
+    /// check plot 3
+    cxx1->cd(3);
+    hOS2->DrawCopy();
+
+    TH1F* hD = (TH1F*)hSS2->Clone("hD");
+    hD->Scale(s);
+    hD->SetLineColor(2);
+    hD->SetMarkerColor(2);
+    hD->SetMarkerStyle(24);
+    hD->DrawCopy("same");
+    lt.DrawLatexNDC(0.6,0.8, "SS pass/fail");
+
+    /// check plot 4
+    cxx1->cd(4);
+    hSS1->SetLineColor(2);
+    hSS1->SetMarkerColor(2);
+    hSS1->SetMarkerStyle(24);
+    hSS2->DrawNormalized();
+    hSS1->DrawNormalized("same");
+
+    lt.DrawLatexNDC(0.6,0.8, "Bkg shapes");
+    cxx1->Update();
+
+    /// save the plots
+    if(savename!="noSave"){
+      cxx1->SaveAs(savename+".eps");
+      cxx1->SaveAs(savename+".pdf");
+      cxx1->SaveAs(savename+".png");
+     }
+
+    return 0;
    }
 
 //   double checkEff(std::string savename="noSave"){
