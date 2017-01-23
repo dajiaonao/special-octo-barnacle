@@ -1,6 +1,9 @@
 /// Use locations:
 // /home/dzhang/work/muons/isolation/iso207/testing
 
+// compile: g++ `root-config --cflags` `root-config --glibs` -lMinuit2 HistFitting.C -o HistFitting
+// Compile to a library
+
 #include <TH1.h>
 #include <TFile.h>
 #include <TCanvas.h>
@@ -17,10 +20,12 @@
 #include <string>
 
 class effFitter{
-   TH1F* hP1;
-   TH1F* hF1;
-   TH1F* hP2;
-   TH1F* hF2;
+   TH1F* hOS1;
+   TH1F* hSS1;
+   TH1F* hOS2;
+   TH1F* hSS2;
+   TH1F* hMC1;
+   TH1F* hMC2;
 public:
    float eff;
    float effErr;
@@ -28,18 +33,24 @@ public:
    float TFErr;
    TString fitMessage;
 
+   void showValues(){
+     std::cout << "eff = " << eff << "; TF = " << TF << std::endl;
+   }
+
+   void setMC(TH1F* h1, TH1F* h2){hMC1 = h1; hMC2 = h2;}
+
    double getChi(const double *xx){
     float e = xx[0];
     float s = xx[1];
 
     float eP = (1.-e)/e;
 
-    TH1F hA(*hP1);
+    TH1F hA(*hOS1);
     hA.Scale(eP);
-    hA.Add(hF2, s);
+    hA.Add(hSS2, s);
 
-    TH1F hB(*hP2);
-    hB.Add(hF1, s*eP);
+    TH1F hB(*hOS2);
+    hB.Add(hSS1, s*eP);
 
 //     std::cout << "e=" << e <<"; s=" << s <<  " val=" << hA.Chi2Test(&hB, "WW") << std::endl; 
 
@@ -52,16 +63,11 @@ public:
 //     return hA.Chi2Test(&hB, "WWCHI2");
     }
 
-   double getEff(TH1F* t_hP1, TH1F* t_hF1, TH1F* t_hP2, TH1F* t_hF2, std::string checkMode=""){
-     hP1 = t_hP1;
-     hF1 = t_hF1;
-     hP2 = t_hP2;
-     hF2 = t_hF2;
-
-//      hP1->Sumw2();
-//      hP2->Sumw2();
-//      hF1->Sumw2();
-//      hF2->Sumw2();
+   double getEff(TH1F* t_hOS1, TH1F* t_hSS1, TH1F* t_hOS2, TH1F* t_hSS2, std::string checkMode=""){
+     hOS1 = t_hOS1;
+     hSS1 = t_hSS1;
+     hOS2 = t_hOS2;
+     hSS2 = t_hSS2;
 
 //      ROOT::Math::GSLSimAnMinimizer min;
      ROOT::Minuit2::Minuit2Minimizer min( ROOT::Minuit2::kMigrad );
@@ -97,6 +103,8 @@ public:
      if(checkMode != ""){
        checkEff(checkMode);
       }
+
+     return 0;
    }
 
 //   double checkEff(std::string savename="noSave"){
@@ -108,17 +116,17 @@ public:
     TLatex lt;
 
     TCanvas* cxx1 = new TCanvas();
-    cxx1->Divide(2,2);
+    cxx1->Divide(3,2);
 
     /// check plot 1: the passed ones, The fit histograms
     cxx1->cd(1);
 
-    TH1F* hA = (TH1F*)hP1->Clone("hA");
+    TH1F* hA = (TH1F*)hOS1->Clone("hA");
     hA->Scale(eP);
-    hA->Add(hF2, s);
+    hA->Add(hSS2, s);
 
-    TH1F* hB = (TH1F*)hP2->Clone("hB");
-    hB->Add(hF1, s*eP);
+    TH1F* hB = (TH1F*)hOS2->Clone("hB");
+    hB->Add(hSS1, s*eP);
 
     hA->SetLineColor(2);
     hA->SetMarkerColor(2);
@@ -130,31 +138,61 @@ public:
 
     /// check plot 2: show signal, with estimated background subtracted 
     auto pad2 = cxx1->cd(2);
-    hP1->DrawCopy();
+    hOS1->DrawCopy();
 
-    TH1F* hC = (TH1F*)hF1->Clone("hC");
+    TH1F* hC = (TH1F*)hSS1->Clone("hC");
     hC->Scale(s);
     hC->SetLineColor(2);
     hC->SetMarkerColor(2);
     hC->SetMarkerStyle(24);
     hC->DrawCopy("same");
 
-    TH1F* hP1c=(TH1F*)hP1->Clone("hP1c");
-    hP1c->Add(hC,-1);
+    TH1F* hOS1c=(TH1F*)hOS1->Clone("hOS1c");
+    hOS1c->Add(hC,-1);
 
-    hP1c->SetLineColor(4);
-    hP1c->SetMarkerColor(4);
-    hP1c->SetMarkerStyle(25);
-    hP1c->DrawCopy("same");
+    hOS1c->SetLineColor(4);
+    hOS1c->SetMarkerColor(4);
+    hOS1c->SetMarkerStyle(25);
+    hOS1c->DrawCopy("same");
+
+    if(hMC1){
+      TH1F* hMC_t = (TH1F*)hMC1->Clone("hMC_temp");
+      hMC_t->Scale(hOS1c->Integral()/hMC1->Integral());
+      hMC_t->SetLineColor(6);
+      hMC_t->Draw("same");
+
+      cxx1->cd(5);
+      TH1F* hOS1c_t = (TH1F*)hOS1c->Clone("hOS1c_t");
+      hOS1c_t->Divide(hMC_t);
+      hOS1c_t->Draw();
+      hOS1c_t->GetYaxis()->SetRangeUser(0.5,1);
+
+      if(hMC2){
+        cxx1->cd(6);
+        hMC1->Draw();
+        hMC2->SetLineStyle(2);
+        hMC2->Draw("same");
+
+        cxx1->cd(5);
+        TH1F* hMC_t3 = (TH1F*)hMC1->Clone("hMC_temp3");
+        TH1F* hMC_t4 = (TH1F*)hMC1->Clone("hMC_temp4");
+        hMC_t3->Add(hMC2);
+        hMC_t4->Divide(hMC_t3);
+        hMC_t4->Draw("same");
+//         gPad->Update();
+      }
+
+      cxx1->cd(2);
+     }
 
     pad2->SetLogy();
     lt.DrawLatexNDC(0.6,0.8, "Bkg subtraction");
 
     /// check plot 3
     cxx1->cd(3);
-    hP2->DrawCopy();
+    hOS2->DrawCopy();
 
-    TH1F* hD = (TH1F*)hF2->Clone("hD");
+    TH1F* hD = (TH1F*)hSS2->Clone("hD");
     hD->Scale(s);
     hD->SetLineColor(2);
     hD->SetMarkerColor(2);
@@ -164,11 +202,11 @@ public:
 
     /// check plot 4
     cxx1->cd(4);
-    hF1->SetLineColor(2);
-    hF1->SetMarkerColor(2);
-    hF1->SetMarkerStyle(24);
-    hF2->DrawNormalized();
-    hF1->DrawNormalized("same");
+    hSS1->SetLineColor(2);
+    hSS1->SetMarkerColor(2);
+    hSS1->SetMarkerStyle(24);
+    hSS2->DrawNormalized();
+    hSS1->DrawNormalized("same");
 
     lt.DrawLatexNDC(0.6,0.8, "Bkg shapes");
     cxx1->Update();
