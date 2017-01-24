@@ -2,6 +2,7 @@
 import os, sys, re
 from ROOT import *
 from rootUtil import useAtlasStyle, waitRootCmd, savehistory
+from array import array
 
 gROOT.LoadMacro("HistFitting.C+")
 from ROOT import effFitter
@@ -40,11 +41,69 @@ class effChecker:
         self.ch3 = ch_MC
         self.cacheFile = None
         self.cut0 = ''
+        self.fitter = None
         
     def updateEventList(self, cut1, elistTag=''):
         useEntryList(self.ch1, cut1, 'elist1'+elistTag)
         if self.ch2: useEntryList(self.ch2, cut1, 'elist2'+elistTag)
         useEntryList(self.ch3, cut1+'&&probe_truth_type==6&&tag_truth_type==6', 'elist3'+elistTag)
+
+    def get3DHistosFromTreeX(self, saveKey='iso', cache=True):
+        mBins = array('f', [70+x*(110.-70.)/100 for x in range(101)]) 
+        ptBins = array('f',range(4,15)+range(15,60,5)+range(60,120,20)+[120, 150, 200, 300, 500])
+        isoBins = array('f', [0, 1])
+        h1 = TH3F("h1","h1;m_{#mu#mu} [GeV];p_{T} [GeV]; Pass isolation",len(mBins)-1, mBins, len(ptBins)-1, ptBins, len(isoBins)-1, isoBins)
+
+        elist0 = self.ch1.GetEventList()
+        if elist0 == None and self.cut0 != '':
+            self.updateEventList(self.cut0)
+
+#         saveKey = 'pt_%s_%s' % (str(ptRange[0]), str(ptRange[1]))
+#         cut1 = '&&probe_pt*0.001>%d&&probe_pt*0.001<%d' % ptRange
+        cut1 = ''
+
+
+        h1_OS = h1.Clone('h1_OS')
+        self.ch1.Draw("probe_matched_IsoTight==1:probe_pt*0.001:dilep_mll*0.001>>h1_OS","probe_q*tag_q<0"+cut1)
+
+        chx = self.ch2 if self.ch2!=None else self.ch1
+        h1_SS = h1.Clone('h1_SS')
+        chx.Draw("probe_matched_IsoTight==1:probe_pt*0.001:dilep_mll*0.001>>h1_SS","probe_q*tag_q>0"+cut1)
+
+        h1_MC = h1.Clone('h1_MC')
+        self.ch3.Draw("probe_matched_IsoTight==1:probe_pt*0.001:dilep_mll*0.001>>h1_MC","probe_q*tag_q<0"+cut1)
+
+        if cache:
+            self.cacheFile.cd()
+            h1_OS.Write("h_"+saveKey+"_OS")
+            h1_SS.Write("h_"+saveKey+"_SS")
+            h1_MC.Write("h_"+saveKey+"_MC")
+        return (h1_OS, h1_SS, h1_MC)
+
+
+    def getHistos(self,ptRange):
+        if self.cacheFile == None:
+            return None
+            
+        ### get histograms
+        h3dOS = self.cacheFile.Get("h_m_Pt_Pass_OS")
+        h3dSS = self.cacheFile.Get("h_m_Pt_Pass_SS")
+        h3dMC = self.cacheFile.Get("h_m_Pt_Pass_MC")
+
+        if h3dOS == None: (h3dOS, h3dSS, h3dMC) = self.get3DHistosFromTreeX("m_Pt_Pass")
+
+        ### get the pt bin
+        ptbin1 = h3dOS.GetYaxis().FindBin(ptRange[0])
+        ptbin2 = h3dOS.GetYaxis().FindBin(ptRange[1])
+
+        h_OSP = h3dOS.ProjectionX("_OSP", ptbin1, ptbin2, 2,2)
+        h_OSF = h3dOS.ProjectionX("_OSF", ptbin1, ptbin2, 1,1)
+        h_SSP = h3dSS.ProjectionX("_SSP", ptbin1, ptbin2, 2,2)
+        h_SSF = h3dSS.ProjectionX("_SSF", ptbin1, ptbin2, 1,1)
+        h_MCP = h3dMC.ProjectionX("_MCP", ptbin1, ptbin2, 2,2)
+        h_MCF = h3dMC.ProjectionX("_MCF", ptbin1, ptbin2, 1,1)
+
+        return (h_MCP, h_MCF, h_OSP, h_OSF, h_SSP, h_SSF)
 
     def getHistosFromCache(self,saveKey):
         if self.cacheFile == None:
@@ -102,14 +161,17 @@ class effChecker:
 
     def test(self, ptRange = (7,9)):
         saveKey = 'pt_%s_%s' % (str(ptRange[0]), str(ptRange[1]))
-        histos = self.getHistosFromCache(saveKey)
-        if histos==None or histos[0]==None:
-            histos = self.getHistosFromTree(ptRange)
+#         histos = self.getHistosFromCache(saveKey)
+#         if histos==None or histos[0]==None:
+#             histos = self.getHistosFromTree(ptRange)
+        histos = self.getHistos(ptRange)
 
         ef1 = effFitter()
+        ef1.fitMessage = '[%.1f, %.1f] GeV' % ptRange
         ef1.setMC(histos[0], histos[1])
-        ef1.getEff(histos[2], histos[4], histos[3], histos[5], "test1")
+        ef1.getEff(histos[2], histos[4], histos[3], histos[5], "check_"+saveKey)
         ef1.showValues()
+        self.fitter = ef1
 
     def test2(self, ptRange = (7,9)):
         saveKey = 'pt_%s_%s' % (str(ptRange[0]), str(ptRange[1]))
@@ -131,6 +193,21 @@ class effChecker:
 # #         ef1.TF = 1
 #             ef1.showHists('test_'+str(i))
 
+    def test3(self, ptRange = (7,9)):
+        saveKey = 'pt_%s_%s' % (str(ptRange[0]), str(ptRange[1]))
+        histos = self.getHistos(ptRange)
+        if histos==None or histos[0]==None:
+            histos = self.getHistosFromTree(ptRange)
+
+        ef1 = effFitter()
+        ef1.setMC(histos[0], histos[1])
+        ef1.hOS1 = histos[2]
+        ef1.hSS1 = histos[3]
+        ef1.hOS2 = histos[4]
+        ef1.hSS2 = histos[5]
+        ef1.eff = 0.9
+        ef1.TF = 1
+        ef1.showHists('test_x')
 
 
 def test3():
@@ -159,7 +236,7 @@ def test3():
 
     ec1 = effChecker(ch1, ch3)
     ec1.cacheFile = TFile("testCache.root",'update')
-    ec1.test()
+    ec1.test3()
 
 # funlist.append(test3)
 
@@ -195,9 +272,34 @@ def test2():
     ec1 = effChecker(ch1, ch3)
     ec1.cut0 = cut1
     ec1.cacheFile = TFile("testCache1.root",'update')
-    ec1.test()
-    ec1.test((30,40))
-    ec1.test((20,30))
+
+    ptX = range(4,15)+range(15,60,5)+range(60,120,20)+[120, 150, 200, 300, 500]
+
+    g1 = TGraphErrors()
+    T1 = TGraphErrors()
+    for i in range(len(ptX)-1):
+        if ptX[i+1]>80: break
+        ec1.test((ptX[i],ptX[i+1]))
+
+        pt = 0.5*(ptX[i]+ptX[i+1])
+        dpt = 0.5*(ptX[i+1]-ptX[i])
+        ef1 = ec1.fitter
+        g1.SetPoint(i, pt, ef1.eff)
+        g1.SetPointError(i, dpt, ef1.effErr)
+        T1.SetPoint(i, pt, ef1.TF)
+        T1.SetPointError(i, dpt, ef1.TFErr)
+
+
+    cx1 = TCanvas()
+    cx1.cd()
+    g1.Draw("APL")
+    gPad.Update()
+    waitRootCmd("eff")
+
+    T1.Draw("APL")
+    gPad.Update()
+    waitRootCmd("TF")
+
 
 #     ec1.test2((30,40));
 

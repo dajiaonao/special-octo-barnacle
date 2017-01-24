@@ -19,15 +19,17 @@
 #include <vector>
 #include <string>
 
+typedef TH1D TH1X;
+
 class effFitter{
 public:
-   TH1F* hOS1;
-   TH1F* hSS1;
-   TH1F* hOS2;
-   TH1F* hSS2;
-   TH1F* hMC1;
-   TH1F* hMC2;
-   TH1F* hMCr;
+   TH1X* hOS1;
+   TH1X* hSS1;
+   TH1X* hOS2;
+   TH1X* hSS2;
+   TH1X* hMC1;
+   TH1X* hMC2;
+   TH1X* hMCr;
    float eff;
    float effErr;
    float TF;
@@ -38,15 +40,15 @@ public:
      std::cout << "eff = " << eff << "+/-" << effErr << "; TF = " << TF << "+/-" << TFErr << std::endl;
    }
 
-   void setMC(TH1F* h1, TH1F* h2){hMC1 = h1; hMC2 = h2;}
+   void setMC(TH1X* h1, TH1X* h2){hMC1 = h1; hMC2 = h2;}
 
 
    void showHists(TString savename="test"){
     float e = eff;
     float s = TF;
 
-    TH1F e1(*hMC1);
-    TH1F hMC0(*hMC1);
+    TH1X e1(*hMC1);
+    TH1X hMC0(*hMC1);
     hMC0.Add(hMC2);
     e1.Divide(&hMC0);
 
@@ -54,32 +56,32 @@ public:
     std::cout << e1.GetMaximumBin() << "->" << e1.GetBinContent(e1.GetMaximumBin()) << " " << e << std::endl;
     e1.Scale(e/e1.GetBinContent(e1.GetMaximumBin()));
 
-    TH1F e1m(e1); /// 1-eff
+    TH1X e1m(e1); /// 1-eff
     for(int i=0;i<e1m.GetNbinsX()+2;i++){
       e1m.SetBinContent(i, 1.-e1m.GetBinContent(i));
      }
 
     /* The method:  ssPass*TF*(1-e) + osFail*e = osPass*(1-e) + ssFail*T*e is the formular*/
-    TH1F hA1(*hSS1);
+    TH1X hA1(*hSS1);
     hA1.Multiply(&e1m);
     hA1.Scale(s);
 
-    TH1F hA2(*hOS2);
+    TH1X hA2(*hOS2);
     hA2.Multiply(&e1);
 
     /// LHS
-    TH1F hA(hA1);
+    TH1X hA(hA1);
     hA.Add(&hA2);
 
-    TH1F hB1(*hOS1);
+    TH1X hB1(*hOS1);
     hB1.Multiply(&e1m);
 
-    TH1F hB2(*hSS2);
+    TH1X hB2(*hSS2);
     hB2.Multiply(&e1);
     hB2.Scale(s);
 
     /// RHS
-    TH1F hB(hB1);
+    TH1X hB(hB1);
     hB.Add(&hB2);
 
     TCanvas cv;
@@ -112,34 +114,34 @@ public:
     float s = xx[1];
     float eP = (1.-e)/e;
 
-    TH1F e1(*hMC1);
-    TH1F hMC0(*hMC1);
+    TH1X e1(*hMC1);
+    TH1X hMC0(*hMC1);
     hMC0.Add(hMC2);
     e1.Divide(&hMC0);
 
     /// multiply scalar efficiency
     e1.Scale(e/e1.GetBinContent(e1.GetMaximumBin()));
 
-    TH1F e1m(e1);
+    TH1X e1m(e1);
     for(int i=0;i<e1m.GetNbinsX()+2;i++){
       e1m.SetBinContent(i, 1.-e1m.GetBinContent(i));
      }
 
     /* The method:  ssPass*TF*(1-e) + osFail*e = osPass*(1-e) + ssFail*T*e is the formular*/
-    TH1F hA(*hSS1);
+    TH1X hA(*hSS1);
     hA.Multiply(&e1m);
     hA.Scale(s);
 
-    TH1F hA2(*hOS2);
+    TH1X hA2(*hOS2);
     hA2.Multiply(&e1);
 
     /// LHS
     hA.Add(&hA2);
 
-    TH1F hB(*hOS1);
+    TH1X hB(*hOS1);
     hB.Multiply(&e1m);
 
-    TH1F hB2(*hSS2);
+    TH1X hB2(*hSS2);
     hB2.Multiply(&e1);
     hB2.Scale(s);
 
@@ -162,11 +164,11 @@ public:
 
     float eP = (1.-e)/e;
 
-    TH1F hA(*hOS1);
+    TH1X hA(*hOS1);
     hA.Scale(eP);
     hA.Add(hSS2, s);
 
-    TH1F hB(*hOS2);
+    TH1X hB(*hOS2);
     hB.Add(hSS1, s*eP);
 
 //     std::cout << "e=" << e <<"; s=" << s <<  " val=" << hA.Chi2Test(&hB, "WW") << std::endl; 
@@ -180,11 +182,21 @@ public:
 //     return hA.Chi2Test(&hB, "WWCHI2");
     }
 
-   double getEff(TH1F* t_hOS1, TH1F* t_hSS1, TH1F* t_hOS2, TH1F* t_hSS2, std::string checkMode=""){
+   double getEff(TH1X* t_hOS1, TH1X* t_hSS1, TH1X* t_hOS2, TH1X* t_hSS2, std::string checkMode=""){
      hOS1 = t_hOS1;
      hSS1 = t_hSS1;
      hOS2 = t_hOS2;
      hSS2 = t_hSS2;
+
+     while(hSS2->GetBinContent(hSS2->GetMinimumBin())<5){
+       hOS1->Rebin();
+       hSS1->Rebin();
+       hOS2->Rebin();
+       hSS2->Rebin();
+
+       if(hMC1) hMC1->Rebin();
+       if(hMC2) hMC2->Rebin();
+     }
 
 //      ROOT::Math::GSLSimAnMinimizer min;
      ROOT::Minuit2::Minuit2Minimizer min( ROOT::Minuit2::kMigrad );
@@ -229,34 +241,34 @@ public:
     float e = eff;
     float s = TF;
 
-    TH1F e1(*hMC1);
-    TH1F hMC0(*hMC1);
+    TH1X e1(*hMC1);
+    TH1X hMC0(*hMC1);
     hMC0.Add(hMC2);
     e1.Divide(&hMC0);
 
     /// multiply scalar efficiency
     e1.Scale(e/e1.GetBinContent(e1.GetMaximumBin()));
 
-    TH1F e1m(e1); /// 1-eff
+    TH1X e1m(e1); /// 1-eff
     for(int i=0;i<e1m.GetNbinsX()+2;i++){
       e1m.SetBinContent(i, 1.-e1m.GetBinContent(i));
      }
 
     /* The method:  ssPass*TF*(1-e) + osFail*e = osPass*(1-e) + ssFail*T*e is the formular*/
-    TH1F hA(*hSS1);
+    TH1X hA(*hSS1);
     hA.Multiply(&e1m);
     hA.Scale(s);
 
-    TH1F hA2(*hOS2);
+    TH1X hA2(*hOS2);
     hA2.Multiply(&e1);
 
     /// LHS
     hA.Add(&hA2);
 
-    TH1F hB(*hOS1);
+    TH1X hB(*hOS1);
     hB.Multiply(&e1m);
 
-    TH1F hB2(*hSS2);
+    TH1X hB2(*hSS2);
     hB2.Multiply(&e1);
     hB2.Scale(s);
 
@@ -284,14 +296,14 @@ public:
     auto pad2 = cxx1->cd(2);
     hOS1->DrawCopy();
 
-    TH1F* hC = (TH1F*)hSS1->Clone("hC");
+    TH1X* hC = (TH1X*)hSS1->Clone("hC");
     hC->Scale(s);
     hC->SetLineColor(2);
     hC->SetMarkerColor(2);
     hC->SetMarkerStyle(24);
     hC->DrawCopy("same");
 
-    TH1F* hOS1c=(TH1F*)hOS1->Clone("hOS1c");
+    TH1X* hOS1c=(TH1X*)hOS1->Clone("hOS1c");
     hOS1c->Add(hC,-1);
 
     hOS1c->SetLineColor(4);
@@ -300,16 +312,16 @@ public:
     hOS1c->DrawCopy("same");
 
     if(hMC1){
-      TH1F* hMC_t = (TH1F*)hMC1->Clone("hMC_temp");
+      TH1X* hMC_t = (TH1X*)hMC1->Clone("hMC_temp");
       hMC_t->Scale(hOS1c->Integral()/hMC1->Integral());
       hMC_t->SetLineColor(6);
       hMC_t->Draw("same");
 
       cxx1->cd(5);
-      TH1F* hOS1c_t = (TH1F*)hOS1c->Clone("hOS1c_t");
+      TH1X* hOS1c_t = (TH1X*)hOS1c->Clone("hOS1c_t");
       hOS1c_t->Divide(hMC_t);
       hOS1c_t->Draw();
-      hOS1c_t->GetYaxis()->SetRangeUser(0.5,1);
+      hOS1c_t->GetYaxis()->SetRangeUser(0.5,1.2);
 
       if(hMC2){
         cxx1->cd(6);
@@ -318,8 +330,8 @@ public:
         hMC2->Draw("same");
 
         cxx1->cd(5);
-        TH1F* hMC_t3 = (TH1F*)hMC1->Clone("hMC_temp3");
-        TH1F* hMC_t4 = (TH1F*)hMC1->Clone("hMC_temp4");
+        TH1X* hMC_t3 = (TH1X*)hMC1->Clone("hMC_temp3");
+        TH1X* hMC_t4 = (TH1X*)hMC1->Clone("hMC_temp4");
         hMC_t3->Add(hMC2);
         hMC_t4->Divide(hMC_t3);
         hMC_t4->Draw("same");
@@ -336,13 +348,13 @@ public:
     cxx1->cd(3);
     hOS2->DrawCopy();
 
-    TH1F* hD = (TH1F*)hSS2->Clone("hD");
+    TH1X* hD = (TH1X*)hSS2->Clone("hD");
     hD->Scale(s);
     hD->SetLineColor(2);
     hD->SetMarkerColor(2);
     hD->SetMarkerStyle(24);
     hD->DrawCopy("same");
-    lt.DrawLatexNDC(0.6,0.8, "SS pass/fail");
+    lt.DrawLatexNDC(0.6,0.8, "OS/SS fail");
 
     /// check plot 4
     cxx1->cd(4);
@@ -379,11 +391,11 @@ public:
     /// check plot 1: the passed ones, The fit histograms
     cxx1->cd(1);
 
-    TH1F* hA = (TH1F*)hOS1->Clone("hA");
+    TH1X* hA = (TH1X*)hOS1->Clone("hA");
     hA->Scale(eP);
     hA->Add(hSS2, s);
 
-    TH1F* hB = (TH1F*)hOS2->Clone("hB");
+    TH1X* hB = (TH1X*)hOS2->Clone("hB");
     hB->Add(hSS1, s*eP);
 
     hA->SetLineColor(2);
@@ -398,14 +410,14 @@ public:
     auto pad2 = cxx1->cd(2);
     hOS1->DrawCopy();
 
-    TH1F* hC = (TH1F*)hSS1->Clone("hC");
+    TH1X* hC = (TH1X*)hSS1->Clone("hC");
     hC->Scale(s);
     hC->SetLineColor(2);
     hC->SetMarkerColor(2);
     hC->SetMarkerStyle(24);
     hC->DrawCopy("same");
 
-    TH1F* hOS1c=(TH1F*)hOS1->Clone("hOS1c");
+    TH1X* hOS1c=(TH1X*)hOS1->Clone("hOS1c");
     hOS1c->Add(hC,-1);
 
     hOS1c->SetLineColor(4);
@@ -414,13 +426,13 @@ public:
     hOS1c->DrawCopy("same");
 
     if(hMC1){
-      TH1F* hMC_t = (TH1F*)hMC1->Clone("hMC_temp");
+      TH1X* hMC_t = (TH1X*)hMC1->Clone("hMC_temp");
       hMC_t->Scale(hOS1c->Integral()/hMC1->Integral());
       hMC_t->SetLineColor(6);
       hMC_t->Draw("same");
 
       cxx1->cd(5);
-      TH1F* hOS1c_t = (TH1F*)hOS1c->Clone("hOS1c_t");
+      TH1X* hOS1c_t = (TH1X*)hOS1c->Clone("hOS1c_t");
       hOS1c_t->Divide(hMC_t);
       hOS1c_t->Draw();
       hOS1c_t->GetYaxis()->SetRangeUser(0.5,1);
@@ -432,8 +444,8 @@ public:
         hMC2->Draw("same");
 
         cxx1->cd(5);
-        TH1F* hMC_t3 = (TH1F*)hMC1->Clone("hMC_temp3");
-        TH1F* hMC_t4 = (TH1F*)hMC1->Clone("hMC_temp4");
+        TH1X* hMC_t3 = (TH1X*)hMC1->Clone("hMC_temp3");
+        TH1X* hMC_t4 = (TH1X*)hMC1->Clone("hMC_temp4");
         hMC_t3->Add(hMC2);
         hMC_t4->Divide(hMC_t3);
         hMC_t4->Draw("same");
@@ -450,7 +462,7 @@ public:
     cxx1->cd(3);
     hOS2->DrawCopy();
 
-    TH1F* hD = (TH1F*)hSS2->Clone("hD");
+    TH1X* hD = (TH1X*)hSS2->Clone("hD");
     hD->Scale(s);
     hD->SetLineColor(2);
     hD->SetMarkerColor(2);
@@ -481,7 +493,7 @@ public:
 };
 
 
-int run_HistFitting(TH1F* hP1, TH1F* hF1, TH1F* hP2, TH1F* hF2){
+int run_HistFitting(TH1X* hP1, TH1X* hF1, TH1X* hP2, TH1X* hF2){
   std::cout << "testing" << std::endl;
 
 //   for(int i=0; i<hP1->GetNbinsX()+2; i++){
@@ -499,11 +511,11 @@ int run_HistFitting(TH1F* hP1, TH1F* hF1, TH1F* hP2, TH1F* hF2){
     e = 0.81+0.01*i;
     float eP = (1.-e)/e;
 
-    TH1F hA(*hP1);
+    TH1X hA(*hP1);
     hA.Scale(eP);
     hA.Add(hF2, s);
 
-    TH1F hB(*hP2);
+    TH1X hB(*hP2);
     hB.Add(hF1, s*eP);
 
     float chi2 = hA.Chi2Test(&hB, "WWCHI2");
@@ -528,12 +540,12 @@ int HistMore(){
   std::vector< std::string > ptBins{"4_5","5_6","6_7","7_8","8_9","9_10","10_11","111_12","12_13","13_14","14_15"};
   for(auto x: ptBins){
     TCanvas* cav1 = (TCanvas*)fPass.Get(("Dist_Bkg_Data_ZMass_"+x).c_str());
-    TH1F* hP1 = (TH1F*) cav1->GetPrimitive("eff_Data_Draw");
-    TH1F* hF1 = (TH1F*) cav1->GetPrimitive("eff_bkg_Draw");
+    TH1X* hP1 = (TH1X*) cav1->GetPrimitive("eff_Data_Draw");
+    TH1X* hF1 = (TH1X*) cav1->GetPrimitive("eff_bkg_Draw");
 
     TCanvas* cav2 = (TCanvas*)fFail.Get(("Dist_Bkg_Data_ZMass_"+x).c_str());
-    TH1F* hP2 = (TH1F*) cav2->GetPrimitive("eff_Data_Draw");
-    TH1F* hF2 = (TH1F*) cav2->GetPrimitive("eff_bkg_Draw");
+    TH1X* hP2 = (TH1X*) cav2->GetPrimitive("eff_Data_Draw");
+    TH1X* hF2 = (TH1X*) cav2->GetPrimitive("eff_bkg_Draw");
 
     j.fitMessage = x;
     j.getEff(hP1, hF1, hP2, hF2, "figs_2017Jan18/fit_"+x);
@@ -564,12 +576,12 @@ int HistFitting(){
   TString lx("13<p_{T}<14 GeV");
 
   TCanvas* cav1 = (TCanvas*)fPass.Get(("Dist_Bkg_Data_ZMass"+x).c_str());
-  TH1F* hP1 = (TH1F*) cav1->GetPrimitive("eff_Data_Draw");
-  TH1F* hF1 = (TH1F*) cav1->GetPrimitive("eff_bkg_Draw");
+  TH1X* hP1 = (TH1X*) cav1->GetPrimitive("eff_Data_Draw");
+  TH1X* hF1 = (TH1X*) cav1->GetPrimitive("eff_bkg_Draw");
 
   TCanvas* cav2 = (TCanvas*)fFail.Get(("Dist_Bkg_Data_ZMass"+x).c_str());
-  TH1F* hP2 = (TH1F*) cav2->GetPrimitive("eff_Data_Draw");
-  TH1F* hF2 = (TH1F*) cav2->GetPrimitive("eff_bkg_Draw");
+  TH1X* hP2 = (TH1X*) cav2->GetPrimitive("eff_Data_Draw");
+  TH1X* hF2 = (TH1X*) cav2->GetPrimitive("eff_bkg_Draw");
 
 //   return run_HistFitting(hP1, hF1, hP2, hF2);
   effFitter j;
@@ -600,11 +612,11 @@ int HistFitting(){
   cxx1->Divide(2,2);
   cxx1->cd(1);
 
-  TH1F* hA = (TH1F*)hP1->Clone("hA");
+  TH1X* hA = (TH1X*)hP1->Clone("hA");
   hA->Scale(eP);
   hA->Add(hF2, s);
 
-  TH1F* hB = (TH1F*)hP2->Clone("hB");
+  TH1X* hB = (TH1X*)hP2->Clone("hB");
   hB->Add(hF1, s*eP);
 
   hA->SetLineColor(2);
@@ -621,14 +633,14 @@ int HistFitting(){
   cxx1->cd(2);
   hP1->DrawCopy();
 
-  TH1F* hC = (TH1F*)hF1->Clone("hC");
+  TH1X* hC = (TH1X*)hF1->Clone("hC");
   hC->Scale(s);
   hC->SetLineColor(2);
   hC->SetMarkerColor(2);
   hC->SetMarkerStyle(24);
   hC->DrawCopy("same");
 
-  TH1F* hP1c=(TH1F*)hP1->Clone("hP1c");
+  TH1X* hP1c=(TH1X*)hP1->Clone("hP1c");
   hP1c->Add(hC,-1);
 
   hP1c->SetLineColor(4);
@@ -644,7 +656,7 @@ int HistFitting(){
 //   cxx3->cd();
   hP2->DrawCopy();
 
-  TH1F* hD = (TH1F*)hF2->Clone("hD");
+  TH1X* hD = (TH1X*)hF2->Clone("hD");
   hD->Scale(s);
   hD->SetLineColor(2);
   hD->SetMarkerColor(2);
@@ -664,7 +676,7 @@ int HistFitting(){
   hF2->DrawNormalized();
   hF1->DrawNormalized("same");
 
-//   TH1F* hFx = (TH1F*)hF2->Clone("hFx");
+//   TH1X* hFx = (TH1X*)hF2->Clone("hFx");
 //   hFx->Divide(hF1);
 //   hFx->SetLineColor(4);
 //   hFx->SetMarkerColor(4);
@@ -674,8 +686,8 @@ int HistFitting(){
   lt.DrawLatexNDC(0.7,0.8, lx);
 //   cxx4->Update();
 
-//   TH1F h1("h1","h1",10,0,10);
-//   TH1F* h2 = (TH1F*)h1.Clone("h2");
+//   TH1X h1("h1","h1",10,0,10);
+//   TH1X* h2 = (TH1X*)h1.Clone("h2");
 // 
 //   h1.Fill(3);
 
