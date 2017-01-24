@@ -35,7 +35,7 @@ public:
    TString fitMessage;
 
    void showValues(){
-     std::cout << "eff = " << eff << "; TF = " << TF << std::endl;
+     std::cout << "eff = " << eff << "+/-" << effErr << "; TF = " << TF << "+/-" << TFErr << std::endl;
    }
 
    void setMC(TH1F* h1, TH1F* h2){hMC1 = h1; hMC2 = h2;}

@@ -196,7 +196,8 @@ def test2():
     ec1.cut0 = cut1
     ec1.cacheFile = TFile("testCache1.root",'update')
     ec1.test()
-#     ec1.test((30,40))
+    ec1.test((30,40))
+    ec1.test((20,30))
 
 #     ec1.test2((30,40));
 
